@@ -1,6 +1,5 @@
-# Copyright 1999-2014 Gentoo Foundation
+# Copyright 2014 athor (rilian-la-te)
 # Distributed under the terms of the GNU General Public License v2
-# $Header: /var/cvsroot/gentoo-x86/app-forensics/aide/aide-0.15.1.ebuild,v 1.6 2014/03/01 23:07:16 mgorny Exp $
 
 EAPI="5"
 
@@ -15,12 +14,14 @@ SRC_URI=""
 SLOT="0"
 LICENSE="GPL-2"
 KEYWORDS="~amd64 ~x86"
-IUSE="static perl"
+IUSE="+perl +cdb"
+REQUIRED_USE="cdb"
 
-DEPEND="dev-db/tinycdb
-	perl? ( dev-lang/perl )"
+DEPEND="cdb? ( dev-db/tinycdb )
+	perl? ( dev-lang/perl )
+	sys-libs/libcap"
 
-RDEPEND="!static? ( ${DEPEND} )"
+RDEPEND="${DEPEND}"
 
 DEPEND="${DEPEND}
 	sys-devel/bison
@@ -36,6 +37,10 @@ src_prepare() {
 
 src_configure() {
 	econf \
+		--sysconfdir="${EPREFIX}/etc/osec" \
+		--datadir="${EPREFIX}/etc/osec" \
+		 || die "econf failed"
+#		$(use_with e2fsattrs) \
 #		$(use_with acl posix-acl) \
 #		$(use_with audit) \
 #		$(use_with curl) \
@@ -47,20 +52,22 @@ src_configure() {
 #		$(use_with selinux) \
 #		$(use_enable static) \
 #		$(use_with xattr) \
-#		$(use_with zlib) \
-#		--sysconfdir="${EPREFIX}/etc/osec" \
-#		 || die "econf failed"
-#		$(use_with e2fsattrs) \
 }
 
 src_install() {
 	emake DESTDIR="${D}" install install-man || die "emake install failed"
 
-	dodoc AUTHORS ChangeLog NEWS README TODO data/osec.cron || die
-#	dohtml doc/manual.html || die
+	nonfatal dodoc AUTHORS ChangeLog NEWS README TODO data/osec.cron
+	rm "${D}/usr/bin/osec_rpm_reporter" 
+	if use !perl; then
+		rm "${D}/usr/bin/osec_mailer"
+		rm "${D}/usr/bin/osec_reporter"
+	fi
+	
 }
 
 pkg_postinst() {
-	elog
-	elog
+	elog "Simple config file installed to /etc/osec/dirs.conf"
+	elog "Cron job are installed to docs. To use, copy it to appropriate folder"
+	elog "To start use osec, run chmod -R +r from osec user on checked folders"
 }
