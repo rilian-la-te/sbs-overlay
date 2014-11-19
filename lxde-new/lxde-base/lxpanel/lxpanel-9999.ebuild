@@ -4,23 +4,26 @@
 
 EAPI="4"
 
-inherit autotools eutils readme.gentoo versionator
+inherit autotools eutils readme.gentoo versionator git-2
 
 MAJOR_VER="$(get_version_component_range 1-2)"
 
 DESCRIPTION="Lightweight X11 desktop panel for LXDE"
 HOMEPAGE="http://lxde.org/"
-SRC_URI="mirror://sourceforge/lxde/LXPanel%20%28desktop%20panel%29/LXPanel%20${MAJOR_VER}.x/${P}.tar.xz"
+EGIT_PROJECT='lxpanel-fork'
+EGIT_REPO_URI="https://github.com/rilian-la-te/lxpanel-fork.git"
 
 LICENSE="GPL-2"
 KEYWORDS="~alpha ~amd64 ~arm ~ppc ~x86 ~x86-interix ~amd64-linux ~arm-linux ~x86-linux"
 SLOT="0"
-IUSE="+alsa wifi"
+IUSE="+alsa wifi gtk3"
 RESTRICT="test"  # bug 249598
 
-RDEPEND="x11-libs/gtk+:2
-	>=x11-libs/libfm-1.2.0
-	x11-libs/libwnck:1
+RDEPEND="gtk3? ( x11-libs/gtk+:3
+				x11-libs/libwnck:3 )
+		 !gtk3? ( x11-libs/gtk+:2
+				x11-libs/libwnck:1 )
+	>=x11-libs/libfm-1.2.0[gtk3=]
 	x11-libs/libXmu
 	x11-libs/libXpm
 	x11-libs/cairo
@@ -41,7 +44,7 @@ This will not be an issue with first time installations."
 src_prepare() {
 	#bug #522404
 #	epatch "${FILESDIR}"/${PN}-0.7.0-right-click-fix.patch
-	epatch "${FILESDIR}"/${PN}-0.5.9-sandbox.patch
+#	epatch "${FILESDIR}"/${PN}-0.5.9-sandbox.patch
 	#bug #415595
 	sed -i "s:-Werror::" configure.ac || die
 	eautoreconf
@@ -49,13 +52,12 @@ src_prepare() {
 
 src_configure() {
 	local plugins="netstatus,volume,cpu,deskno,batt, \
-		kbled,xkb,thermal,cpufreq,monitors"
+		kbled,xkb,thermal,cpufreq,monitors,weather"
 
 	use wifi && plugins+=",netstat"
 	use alsa && plugins+=",volumealsa"
 	[[ ${CHOST} == *-interix* ]] && plugins=deskno,kbled,xkb
-
-	econf $(use_enable alsa) --with-x --with-plugins="${plugins}"
+	econf $(use_enable alsa) $(use_enable gtk3) --with-x --with-plugins="${plugins}"
 	# the gtk+ dep already pulls in libX11, so we might as well hardcode with-x
 }
 

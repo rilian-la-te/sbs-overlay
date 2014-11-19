@@ -15,7 +15,7 @@ SLOT="0"
 KEYWORDS="~amd64 ~x86"
 IUSE=""
 
-DEPEND=">=sys-libs/pam-0.75"
+DEPEND=">=sys-libs/pambase"
 RDEPEND="${DEPEND}"
 
 pkg_setup() {
