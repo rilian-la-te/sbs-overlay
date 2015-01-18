@@ -8,10 +8,10 @@ inherit autotools eutils readme.gentoo versionator git-2
 
 MAJOR_VER="$(get_version_component_range 1-2)"
 
-DESCRIPTION="Lightweight X11 desktop panel for LXDE"
+DESCRIPTION="Lightweight desktop panel"
 HOMEPAGE="http://lxde.org/"
-EGIT_PROJECT='lxpanel-fork'
-EGIT_REPO_URI="https://github.com/rilian-la-te/lxpanel-fork.git"
+EGIT_PROJECT='simple-panel'
+EGIT_REPO_URI="https://github.com/rilian-la-te/simple-panel.git"
 
 LICENSE="GPL-2"
 KEYWORDS="~alpha ~amd64 ~arm ~ppc ~x86 ~x86-interix ~amd64-linux ~arm-linux ~x86-linux"
@@ -24,13 +24,8 @@ RDEPEND="gtk3? ( x11-libs/gtk+:3
 		 !gtk3? ( x11-libs/gtk+:2
 				x11-libs/libwnck:1 )
 	>=x11-libs/libfm-1.2.0[gtk3=]
-	x11-libs/libXmu
-	x11-libs/libXpm
 	x11-libs/cairo
 	x11-libs/gdk-pixbuf
-	x11-libs/libX11
-	lxde-base/lxmenu-data
-	lxde-base/menu-cache
 	alsa? ( media-libs/alsa-lib )
 	wifi? ( net-wireless/wireless-tools )"
 DEPEND="${RDEPEND}

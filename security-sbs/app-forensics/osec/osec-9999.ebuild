@@ -3,7 +3,7 @@
 
 EAPI="5"
 
-inherit autotools confutils eutils git-2
+inherit autotools confutils eutils git-2 systemd
 
 DESCRIPTION="OSEC is AltLinux Security Tool"
 HOMEPAGE="https://sourceforge.net/projects/o-security/"
@@ -57,7 +57,7 @@ src_configure() {
 src_install() {
 	emake DESTDIR="${D}" install install-man || die "emake install failed"
 
-	nonfatal dodoc AUTHORS ChangeLog NEWS README TODO data/osec.cron
+	nonfatal dodoc AUTHORS ChangeLog NEWS README TODO data/osec.timer
 	rm "${D}/usr/bin/osec_rpm_reporter" 
 	if use !perl; then
 		rm "${D}/usr/bin/osec_mailer"
