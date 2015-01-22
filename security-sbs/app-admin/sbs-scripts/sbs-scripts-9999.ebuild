@@ -3,7 +3,8 @@
 
 EAPI=5
 
-inherit eutils git-2
+PYTHON_COMPAT=( python2_{7} )
+inherit git-2 autotools eutils
 
 DESCRIPTION="pwd-force-locker is small utility that sets passwords expired after each shutdown"
 HOMEPAGE="https://github.com/rilian-la-te/pwd-force-locker"
@@ -15,10 +16,17 @@ LICENSE="GPL"
 SLOT="0"
 KEYWORDS="~amd64 ~x86"
 
+RDEPEND="app-backup/fsarchiver"
+DEPEND="${RDEPEND}"
+
+src_prepare() {
+   eautoreconf
+}
+
 src_compile() {
         emake FLAGS="${CFLAGS}" || die "emake failed"
 }
 
 src_install() {
-	emake DESTDIR="${D}" bindir="${D}/usr/bin" libdir="${D}/lib" install
+	emake DESTDIR="${D}" install
 }
