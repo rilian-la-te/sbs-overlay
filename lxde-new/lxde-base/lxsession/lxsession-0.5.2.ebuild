@@ -52,8 +52,7 @@ src_prepare() {
 	# bug #496880
 	#epatch "${FILESDIR}"/${P}-fix-logind-dbus-calls.patch
 	if use gtk3; then
-		epatch "${FILESDIR}"/${P}-gtk3.patch
-		rm "${WORKDIR}"/lxsession-default-apps/*.c
+		rm "${WORKDIR}"/"${P}"/lxsession-default-apps/*.c
 	fi
 	eautoreconf
 }
@@ -65,4 +64,10 @@ src_configure() {
 		$(use_enable gtk3)\
 		$(use_enable clipboard buildin-clipboard)\
 		$(use_enable polkit-agent buildin-polkit)
+}
+
+src_compile() {
+    if [ -f Makefile ] || [ -f GNUmakefile ] || [ -f makefile ]; then
+        emake -j1 || die "emake failed"
+    fi
 }
