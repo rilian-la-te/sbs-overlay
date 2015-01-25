@@ -1,0 +1,68 @@
+diff --git a/crypto/hash_info.c b/crypto/hash_info.c
+index 3e7ff46..31628f3 100644
+--- a/crypto/hash_info.c
++++ b/crypto/hash_info.c
+@@ -21,6 +21,7 @@ const char *const hash_algo_name[HASH_ALGO__LAST] = {
+ 	[HASH_ALGO_SHA256]	= "sha256",
+ 	[HASH_ALGO_SHA384]	= "sha384",
+ 	[HASH_ALGO_SHA512]	= "sha512",
++	[HASH_ALGO_STRIBOG512]	= "stribog512",
+ 	[HASH_ALGO_SHA224]	= "sha224",
+ 	[HASH_ALGO_RIPE_MD_128]	= "rmd128",
+ 	[HASH_ALGO_RIPE_MD_256]	= "rmd256",
+@@ -42,6 +43,7 @@ const int hash_digest_size[HASH_ALGO__LAST] = {
+ 	[HASH_ALGO_SHA256]	= SHA256_DIGEST_SIZE,
+ 	[HASH_ALGO_SHA384]	= SHA384_DIGEST_SIZE,
+ 	[HASH_ALGO_SHA512]	= SHA512_DIGEST_SIZE,
++	[HASH_ALGO_STRIBOG512]	= STRIBOG512_DIGEST_SIZE,
+ 	[HASH_ALGO_SHA224]	= SHA224_DIGEST_SIZE,
+ 	[HASH_ALGO_RIPE_MD_128]	= RMD128_DIGEST_SIZE,
+ 	[HASH_ALGO_RIPE_MD_256]	= RMD256_DIGEST_SIZE,
+diff --git a/include/crypto/hash_info.h b/include/crypto/hash_info.h
+index e1e5a3e..7e921a5 100644
+--- a/include/crypto/hash_info.h
++++ b/include/crypto/hash_info.h
+@@ -15,6 +15,7 @@
+ 
+ #include <crypto/sha.h>
+ #include <crypto/md5.h>
++#include <crypto/stribog.h>
+ 
+ #include <uapi/linux/hash_info.h>
+ 
+diff --git a/include/uapi/linux/hash_info.h b/include/uapi/linux/hash_info.h
+index ca18c45..9656954 100644
+--- a/include/uapi/linux/hash_info.h
++++ b/include/uapi/linux/hash_info.h
+@@ -21,6 +21,7 @@ enum hash_algo {
+ 	HASH_ALGO_SHA256,
+ 	HASH_ALGO_SHA384,
+ 	HASH_ALGO_SHA512,
++	HASH_ALGO_STRIBOG512,
+ 	HASH_ALGO_SHA224,
+ 	HASH_ALGO_RIPE_MD_128,
+ 	HASH_ALGO_RIPE_MD_256,
+diff --git a/security/integrity/ima/Kconfig b/security/integrity/ima/Kconfig
+index 08758fb..dbfbc07 100644
+--- a/security/integrity/ima/Kconfig
++++ b/security/integrity/ima/Kconfig
+@@ -99,6 +99,11 @@ choice
+ 	config IMA_DEFAULT_HASH_WP512
+ 		bool "WP512"
+ 		depends on CRYPTO_WP512 && !IMA_TEMPLATE
++
++	config IMA_DEFAULT_HASH_STRIBOG
++		bool "GOST 34.11 2012"
++		depends on CRYPTO_STRIBOG && !IMA_TEMPLATE
++
+ endchoice
+ 
+ config IMA_DEFAULT_HASH
+@@ -108,6 +113,7 @@ config IMA_DEFAULT_HASH
+ 	default "sha256" if IMA_DEFAULT_HASH_SHA256
+ 	default "sha512" if IMA_DEFAULT_HASH_SHA512
+ 	default "wp512" if IMA_DEFAULT_HASH_WP512
++	default "stribog512" if IMA_DEFAULT_HASH_STRIBOG
+ 
+ config IMA_APPRAISE
+ 	bool "Appraise integrity measurements"

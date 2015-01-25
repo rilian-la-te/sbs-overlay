@@ -1,0 +1,449 @@
+diff --git a/crypto/Kconfig b/crypto/Kconfig
+index 6f6d006..c8f2da2 100644
+--- a/crypto/Kconfig
++++ b/crypto/Kconfig
+@@ -680,6 +680,17 @@ config CRYPTO_AES
+ 
+ 	  See <http://csrc.nist.gov/CryptoToolkit/aes/> for more information.
+ 
++config CRYPTO_GOST
++	tristate "GOST cipher algorithms"
++	select CRYPTO_ALGAPI
++	help
++	  The GOST 28147-89 cipher.
++
++	  This is Russian standard cipher. It is better than DES, but not
++	  than AES. It is required to use in Russian certufued software.
++
++	  The GOST key size of 256 bits
++
+ config CRYPTO_AES_586
+ 	tristate "AES cipher algorithms (i586)"
+ 	depends on (X86 || UML_X86) && !64BIT
+diff --git a/crypto/Makefile b/crypto/Makefile
+index 3c95d45..77c5521 100644
+--- a/crypto/Makefile
++++ b/crypto/Makefile
+@@ -69,6 +69,7 @@ obj-$(CONFIG_CRYPTO_TWOFISH) += twofish_generic.o
+ obj-$(CONFIG_CRYPTO_TWOFISH_COMMON) += twofish_common.o
+ obj-$(CONFIG_CRYPTO_SERPENT) += serpent_generic.o
+ obj-$(CONFIG_CRYPTO_AES) += aes_generic.o
++obj-$(CONFIG_CRYPTO_GOST) += gost_generic.o
+ obj-$(CONFIG_CRYPTO_CAMELLIA) += camellia_generic.o
+ obj-$(CONFIG_CRYPTO_CAST_COMMON) += cast_common.o
+ obj-$(CONFIG_CRYPTO_CAST5) += cast5_generic.o
+diff --git a/crypto/gost_generic.c b/crypto/gost_generic.c
+new file mode 100644
+index 0000000..acf92fb
+--- /dev/null
++++ b/crypto/gost_generic.c
+@@ -0,0 +1,364 @@
++/* $Id: cipher-gost.c,v 1.7 2002/10/04 10:05:23 hvr Exp $ 
++ * 
++ * The GOST 28147-89 cipher 
++ * 
++ * This is based on the 25 November 1993 draft translation 
++ * by Aleksandr Malchik, with Whitfield Diffie, of the Government 
++ * Standard of the U.S.S.R. GOST 28149-89, "Cryptographic Transformation 
++ * Algorithm", effective 1 July 1990.  (Whitfield.Diffie@eng.sun.com) 
++ * 
++ * That is a draft, and may contain errors, which will be faithfully 
++ * reflected here, along with possible exciting new bugs. 
++ * 
++ * Some details have been cleared up by the paper "Soviet Encryption 
++ * Algorithm" by Josef Pieprzyk and Leonid Tombak of the University 
++ * of Wollongong, New South Wales.  (josef/leo@cs.adfa.oz.au) 
++ * 
++ * The standard is written by A. Zabotin (project leader), G.P. Glazkov, 
++ * and V.B. Isaeva.  It was accepted and introduced into use by the 
++ * action of the State Standards Committee of the USSR on 2 June 89 as 
++ * No. 1409.  It was to be reviewed in 1993, but whether anyone wishes 
++ * to take on this obligation from the USSR is questionable. 
++ * 
++ * This code is placed in the public domain. 
++ */  
++  
++#include <linux/module.h>  
++#include <crypto/gost.h>  
++#include <linux/string.h>  
++#include <linux/errno.h>  
++#include <linux/init.h>  
++  
++#include <linux/crypto.h>  
++#include <linux/types.h>  
++  
++#include <asm/byteorder.h>   
++
++#define FAST_SUBSTITUTION 1  
++  
++/* 
++ * If you read the standard, it belabors the point of copying corresponding 
++ * bits from point A to point B quite a bit.  It helps to understand that 
++ * the standard is uniformly little-endian, although it numbers bits from 
++ * 1 rather than 0, so bit n has value 2^(n-1).  The least significant bit 
++ * of the 32-bit words that are manipulated in the algorithm is the first, 
++ * lowest-numbered, in the bit string. 
++ */  
++  
++/* 
++ * The standard does not specify the contents of the 8 4 bit->4 bit 
++ * substitution boxes, saying they're a parameter of the network 
++ * being set up.  For illustration purposes here, I have used 
++ * the first rows of the 8 S-boxes from the DES.  (Note that the 
++ * DES S-boxes are numbered starting from 1 at the msb.  In keeping 
++ * with the rest of the GOST, I have used little-endian numbering. 
++ * Thus, k8 is S-box 1. 
++ * 
++ * Obviously, a careful look at the cryptographic properties of the cipher 
++ * must be undertaken before "production" substitution boxes are defined. 
++ * 
++ * The standard also does not specify a standard bit-string representation 
++ * for the contents of these blocks. 
++ */  
++  
++__visible u8 const k8[16] = {  
++    14,  4, 13,  1,  2, 15, 11,  8,  3, 10,  6, 12,  5,  9,  0,  7 };   
++__visible u8 const k7[16] = {  
++    15,  1,  8, 14,  6, 11,  3,  4,  9,  7,  2, 13, 12,  0,  5, 10 };  
++__visible u8 const k6[16] = {  
++    10,  0,  9, 14,  6,  3, 15,  5,  1, 13, 12,  7, 11,  4,  2,  8 };  
++__visible u8 const k5[16] = {  
++     7, 13, 14,  3,  0,  6,  9, 10,  1,  2,  8,  5, 11, 12,  4, 15 };  
++__visible u8 const k4[16] = {  
++     2, 12,  4,  1,  7, 10, 11,  6,  8,  5,  3, 15, 13,  0, 14,  9 };  
++__visible u8 const k3[16] = {  
++    12,  1, 10, 15,  9,  2,  6,  8,  0, 13,  3,  4, 14,  7,  5, 11 };  
++__visible u8 const k2[16] = {  
++     4, 11,  2, 14, 15,  0,  8, 13,  3, 12,  9,  7,  5, 10,  6,  1 };  
++__visible u8 const k1[16] = {  
++    13,  2,  8,  4,  6, 15, 11,  1, 10,  9,  3, 14,  5,  0, 12,  7 };  
++EXPORT_SYMBOL_GPL(k8);
++EXPORT_SYMBOL_GPL(k7);
++EXPORT_SYMBOL_GPL(k6);
++EXPORT_SYMBOL_GPL(k5);
++EXPORT_SYMBOL_GPL(k4);
++EXPORT_SYMBOL_GPL(k3);
++EXPORT_SYMBOL_GPL(k2);
++EXPORT_SYMBOL_GPL(k1);
++/* computed once */  
++static u8 k87[256];  
++static u8 k65[256];  
++static u8 k43[256];  
++static u8 k21[256];  
++  
++/* 
++ * Build byte-at-a-time subtitution tables. 
++ * This must be called once for global setup. 
++ */  
++static inline void  
++kboxinit(void)  
++{  
++    int i;  
++    for (i = 0; i < 256; i++) {  
++        k87[i] = k8[i >> 4] << 4 | k7[i & 15];  
++        k65[i] = k6[i >> 4] << 4 | k5[i & 15];  
++        k43[i] = k4[i >> 4] << 4 | k3[i & 15];  
++        k21[i] = k2[i >> 4] << 4 | k1[i & 15];  
++    }
++}  
++  
++/* 
++ * Do the substitution and rotation that are the core of the operation, 
++ * like the expansion, substitution and permutation of the DES. 
++ * It would be possible to perform DES-like optimisations and store 
++ * the table entries as 32-bit words, already rotated, but the 
++ * efficiency gain is questionable. 
++ * 
++ * This should be inlined for maximum speed 
++ */  
++static inline u32  
++f(u32 x)  
++{  
++    /* Do substitutions */  
++#if !FAST_SUBSTITUTION  
++    /* This is annoyingly slow */  
++    x = k8[x>>28 & 15] << 28 | k7[x>>24 & 15] << 24 |  
++        k6[x>>20 & 15] << 20 | k5[x>>16 & 15] << 16 |  
++        k4[x>>12 & 15] << 12 | k3[x>> 8 & 15] <<  8 |  
++        k2[x>> 4 & 15] <<  4 | k1[x     & 15];  
++#else /* FAST_SUBSTITUTION */  
++    /* This is faster */  
++    x = k87[x>>24 & 255] << 24 | k65[x>>16 & 255] << 16 |  
++        k43[x>> 8 & 255] <<  8 | k21[x & 255];  
++#endif /* !FAST_SUBSTITUTION */  
++  
++    /* Rotate left 11 bits */  
++    return rol32 (x, 11);  
++}  
++  
++/* 
++ * The GOST standard defines the input in terms of bits 1..64, with 
++ * bit 1 being the lsb of in[0] and bit 64 being the msb of in[1]. 
++ * 
++ * The keys are defined similarly, with bit 256 being the msb of key[7]. 
++ */  
++static inline void  
++GostEncrypt(const u32 in[2], u32 out[2], const u32 key[8])  
++{  
++    register u32 n1, n2; /* As named in the GOST */  
++  
++    n1 = in[0];  
++    n2 = in[1];  
++  
++    /* Instead of swapping halves, swap names each round */  
++    n2 ^= f(n1+key[0]);  
++    n1 ^= f(n2+key[1]);  
++    n2 ^= f(n1+key[2]);  
++    n1 ^= f(n2+key[3]);  
++    n2 ^= f(n1+key[4]);  
++    n1 ^= f(n2+key[5]);  
++    n2 ^= f(n1+key[6]);  
++    n1 ^= f(n2+key[7]);  
++  
++    n2 ^= f(n1+key[0]);  
++    n1 ^= f(n2+key[1]);  
++    n2 ^= f(n1+key[2]);  
++    n1 ^= f(n2+key[3]);  
++    n2 ^= f(n1+key[4]);  
++    n1 ^= f(n2+key[5]);  
++    n2 ^= f(n1+key[6]);  
++    n1 ^= f(n2+key[7]);  
++  
++    n2 ^= f(n1+key[0]);  
++    n1 ^= f(n2+key[1]);  
++    n2 ^= f(n1+key[2]);  
++    n1 ^= f(n2+key[3]);  
++    n2 ^= f(n1+key[4]);  
++    n1 ^= f(n2+key[5]);  
++    n2 ^= f(n1+key[6]);  
++    n1 ^= f(n2+key[7]);  
++  
++    n2 ^= f(n1+key[7]);  
++    n1 ^= f(n2+key[6]);  
++    n2 ^= f(n1+key[5]);  
++    n1 ^= f(n2+key[4]);  
++    n2 ^= f(n1+key[3]);  
++    n1 ^= f(n2+key[2]);  
++    n2 ^= f(n1+key[1]);  
++    n1 ^= f(n2+key[0]);  
++  
++    /* There is no swap after the last round */  
++    out[0] = n2;  
++    out[1] = n1;  
++}  
++      
++  
++/* 
++ * The key schedule is somewhat different for decryption. 
++ * (The key table is used once forward and three times backward.) 
++ * You could define an expanded key, or just write the code twice, 
++ * as done here. 
++ */  
++static inline void  
++GostDecrypt(const u32 in[2], u32 out[2], const u32 key[8])  
++{  
++    register u32 n1, n2; /* As named in the GOST */  
++  
++    n1 = in[0];  
++    n2 = in[1];  
++  
++    n2 ^= f(n1+key[0]);  
++    n1 ^= f(n2+key[1]);  
++    n2 ^= f(n1+key[2]);  
++    n1 ^= f(n2+key[3]);  
++    n2 ^= f(n1+key[4]);  
++    n1 ^= f(n2+key[5]);  
++    n2 ^= f(n1+key[6]);  
++    n1 ^= f(n2+key[7]);  
++  
++    n2 ^= f(n1+key[7]);  
++    n1 ^= f(n2+key[6]);  
++    n2 ^= f(n1+key[5]);  
++    n1 ^= f(n2+key[4]);  
++    n2 ^= f(n1+key[3]);  
++    n1 ^= f(n2+key[2]);  
++    n2 ^= f(n1+key[1]);  
++    n1 ^= f(n2+key[0]);  
++  
++    n2 ^= f(n1+key[7]);  
++    n1 ^= f(n2+key[6]);  
++    n2 ^= f(n1+key[5]);  
++    n1 ^= f(n2+key[4]);  
++    n2 ^= f(n1+key[3]);  
++    n1 ^= f(n2+key[2]);  
++    n2 ^= f(n1+key[1]);  
++    n1 ^= f(n2+key[0]);  
++  
++    n2 ^= f(n1+key[7]);  
++    n1 ^= f(n2+key[6]);  
++    n2 ^= f(n1+key[5]);  
++    n1 ^= f(n2+key[4]);  
++    n2 ^= f(n1+key[3]);  
++    n1 ^= f(n2+key[2]);  
++    n2 ^= f(n1+key[1]);  
++    n1 ^= f(n2+key[0]);  
++  
++    out[0] = n2;  
++    out[1] = n1;  
++}  
++  
++int crypto_gost_set_key(struct crypto_tfm *cx,  
++            const u8 *key, unsigned int key_len)  
++{  
++	struct crypto_gost_ctx *ctx = crypto_tfm_ctx(cx);
++	u32 *flags = &cx->crt_flags; 
++
++	if (key_len != GOST_KEYLENGTH)
++	{
++		*flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
++		return -EINVAL; 
++	}
++	ctx->key_length = key_len;  
++
++	memcpy (ctx->key, key, key_len);  
++
++	le32_to_cpus (&ctx->key[0]);  
++	le32_to_cpus (&ctx->key[1]);  
++	le32_to_cpus (&ctx->key[2]);  
++	le32_to_cpus (&ctx->key[3]);  
++	le32_to_cpus (&ctx->key[4]);  
++	le32_to_cpus (&ctx->key[5]);  
++	le32_to_cpus (&ctx->key[6]);  
++	le32_to_cpus (&ctx->key[7]);  
++	kboxinit();
++	return 0;  
++}
++EXPORT_SYMBOL_GPL(crypto_gost_set_key);
++  
++static void gost_encrypt(struct crypto_tfm *tfm,  
++            u8 *out, const u8 *in)  
++{  
++    const struct crypto_gost_ctx *ctx = crypto_tfm_ctx(tfm);
++  
++    u32 input_buffer[2];  
++    u32 output_buffer[2];  
++  
++    int sz;
++  
++    for (sz = GOST_BLOCK_SIZE; sz >= 8; sz -= 8) {  
++        memcpy(input_buffer, in, sizeof input_buffer);   
++        in += sizeof input_buffer;  
++  
++        cpu_to_le32s (&input_buffer[0]);  
++        cpu_to_le32s (&input_buffer[1]);  
++        GostEncrypt(input_buffer, output_buffer, ctx->key);  
++        cpu_to_le32s (&output_buffer[0]);  
++        cpu_to_le32s (&output_buffer[1]);  
++  
++        memcpy(out, output_buffer, sizeof output_buffer);   
++        out += sizeof output_buffer;  
++    }  
++}  
++  
++static void gost_decrypt(struct crypto_tfm *tfm,  
++            u8 *out, const u8 *in)  
++{  
++    const struct crypto_gost_ctx *ctx = crypto_tfm_ctx(tfm);
++  
++    u32 input_buffer[2];  
++    u32 output_buffer[2];  
++  
++    int sz;   
++  
++    for (sz = GOST_BLOCK_SIZE; sz >= 8; sz -= 8) {  
++        memcpy(input_buffer, in, sizeof input_buffer);   
++        in += sizeof input_buffer;  
++  
++        cpu_to_le32s (&input_buffer[0]);  
++        cpu_to_le32s (&input_buffer[1]);  
++        GostDecrypt(input_buffer, output_buffer, ctx->key);  
++        cpu_to_le32s (&output_buffer[0]);  
++        cpu_to_le32s (&output_buffer[1]);  
++  
++        memcpy(out, output_buffer, sizeof output_buffer);   
++        out += sizeof output_buffer;  
++    }  
++}
++
++static struct crypto_alg gost_alg = {
++	.cra_name		=	"gost",
++	.cra_driver_name	=	"gost-generic",
++	.cra_priority		=	100,
++	.cra_flags		=	CRYPTO_ALG_TYPE_CIPHER,
++	.cra_blocksize		=	GOST_BLOCK_SIZE,
++	.cra_ctxsize		=	sizeof(struct crypto_gost_ctx),
++	.cra_alignmask		=	3,
++	.cra_module		=	THIS_MODULE,
++	.cra_u			=	{
++		.cipher = {
++			.cia_min_keysize	=	GOST_MIN_KEY_SIZE,
++			.cia_max_keysize	=	GOST_MAX_KEY_SIZE,
++			.cia_setkey		=	crypto_gost_set_key,
++			.cia_encrypt		=	gost_encrypt,
++			.cia_decrypt		=	gost_decrypt
++		}
++	}
++};
++
++static int __init gost_init(void)
++{
++	return crypto_register_alg(&gost_alg);
++}
++
++static void __exit gost_fini(void)
++{
++	crypto_unregister_alg(&gost_alg);
++}
++
++module_init(gost_init);
++module_exit(gost_fini);
++
++
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION ("GOST Cipher / CryptoAPI");
++MODULE_ALIAS("gost");
+diff --git a/include/crypto/gost.h b/include/crypto/gost.h
+new file mode 100644
+index 0000000..c502007
+--- /dev/null
++++ b/include/crypto/gost.h
+@@ -0,0 +1,39 @@
++/*
++ * Common values for GOST  algorithm
++ */
++
++#ifndef _CRYPTO_GOST_H
++#define _CRYPTO_GOST_H
++
++#include <linux/types.h>
++#include <linux/crypto.h>
++
++#define GOST_MIN_KEY_SIZE	32
++#define GOST_MAX_KEY_SIZE	32
++#define GOST_KEYSIZE_256	32
++#define GOST_BLOCK_SIZE		64
++#define GOST_KEYLENGTH		32
++#define GOST_KEYLENGTH_U32	(GOST_KEYLENGTH / sizeof(u32))
++
++/*
++ * Please ensure that the first two fields are 16-byte aligned
++ * relative to the start of the structure, i.e., don't move them!
++ */
++
++struct crypto_gost_ctx{  
++    u32 key[GOST_KEYLENGTH_U32];  
++    u32 key_length;
++};  
++
++extern u8 const k8[16];
++extern u8 const k7[16];
++extern u8 const k6[16];
++extern u8 const k5[16];
++extern u8 const k4[16];
++extern u8 const k3[16];
++extern u8 const k2[16];
++extern u8 const k1[16];
++
++int crypto_gost_set_key(struct crypto_tfm *tfm, const u8 *in_key,
++		unsigned int key_len);
++#endif
