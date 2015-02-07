@@ -1,0 +1,63 @@
+diff -ur cups-1.7.3/cups/http-addr.c cups-1.7.3.new/cups/http-addr.c
+--- cups-1.7.3/cups/http-addr.c	2014-06-24 14:39:21.174954690 +0000
++++ cups-1.7.3.new/cups/http-addr.c	2014-06-24 14:33:22.455553712 +0000
+@@ -202,9 +202,14 @@
+     return (1);
+ 
+ #ifdef AF_INET6
+-  if (addr->addr.sa_family == AF_INET6 &&
+-      IN6_IS_ADDR_LOOPBACK(&(addr->ipv6.sin6_addr)))
+-    return (1);
++  if (addr->addr.sa_family == AF_INET6) {
++    if (IN6_IS_ADDR_LOOPBACK(&(addr->ipv6.sin6_addr)))
++      return (1);
++    if (IN6_IS_ADDR_V4MAPPED(&(addr->ipv6.sin6_addr))) 
++      if(addr->ipv6.sin6_addr.s6_addr32[3] == htonl(INADDR_LOOPBACK))
++        return (1);
++  }
++
+ #endif /* AF_INET6 */
+ 
+ #ifdef AF_LOCAL
+diff -ur cups-1.7.3/scheduler/auth.c cups-1.7.3.new/scheduler/auth.c
+--- cups-1.7.3/scheduler/auth.c	2014-06-24 14:39:21.162954978 +0000
++++ cups-1.7.3.new/scheduler/auth.c	2014-06-24 13:58:23.235903941 +0000
+@@ -1301,6 +1301,9 @@
+           netip6[1] = htonl(ip[1]);
+           netip6[2] = htonl(ip[2]);
+           netip6[3] = htonl(ip[3]);
++
++          if(!IN6_IS_ADDR_V4MAPPED(netip6))
++            netip4 = 0;
+ #endif /* AF_INET6 */
+ 
+	  cupsdNetIFUpdate();
+@@ -1906,7 +1909,7 @@
+ 
+     address[0] = 0;
+     address[1] = 0;
+-    address[2] = 0;
++    address[2] = 0xffff;
+     address[3] = ntohl(con->http.hostaddr->ipv4.sin_addr.s_addr);
+   }
+   else
+diff -ur cups-1.7.3/scheduler/client.c cups-1.7.3.new/scheduler/client.c
+--- cups-1.7.3/scheduler/client.c	2014-06-24 14:39:21.290951910 +0000
++++ cups-1.7.3.new/scheduler/client.c	2014-06-24 14:01:32.878499053 +0000
+@@ -190,7 +190,7 @@
+ 
+   _httpAddrSetPort(con->http.hostaddr, httpAddrPort(&(lis->address)));
+ 
+-#ifdef AF_INET6
++#if 0
+  /*
+   * Convert IPv4 over IPv6 addresses (::ffff:n.n.n.n) to IPv4 forms we
+   * can more easily use...
+@@ -4354,6 +4354,7 @@
+	    !_cups_strcasecmp(con->clientname, "localhost.localdomain") ||
+ #endif /* __linux */
+             !strcmp(con->clientname, "127.0.0.1") ||
++            !strcmp(con->clientname, "[v1.::ffff:127.0.0.1]") ||
+	    !strcmp(con->clientname, "[::1]"));
+   }
+ 

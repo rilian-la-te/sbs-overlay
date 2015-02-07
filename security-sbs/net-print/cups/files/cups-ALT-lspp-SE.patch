@@ -1,0 +1,84 @@
+diff -ruN cups-1.6.2/scheduler/client.c cups-1.6.2-mod/scheduler/client.c
+--- cups-1.6.2/scheduler/client.c	2013-10-31 09:16:20.497028074 +0000
++++ cups-1.6.2-mod/scheduler/client.c	2013-10-31 09:13:01.688563767 +0000
+@@ -379,7 +379,7 @@
+ #endif /* HAVE_TCPD_H */
+ 
+ #ifdef WITH_LSPP
+-  if (is_lspp_config())
++  if (is_selinux_mls_enabled())
+   {
+     struct ucred cr;
+     unsigned int cl=sizeof(cr);
+diff -ruN cups-1.6.2/scheduler/ipp.c cups-1.6.2-mod/scheduler/ipp.c
+--- cups-1.6.2/scheduler/ipp.c	2013-10-31 09:16:20.501027851 +0000
++++ cups-1.6.2-mod/scheduler/ipp.c	2013-10-31 09:21:17.732501407 +0000
+@@ -1608,7 +1608,7 @@
+     ippAddString(con->request, IPP_TAG_JOB, IPP_TAG_NAME, "job-name", NULL,
+                  "Untitled");
+ #ifdef WITH_LSPP
+-  if (is_lspp_config())
++  if (is_selinux_mls_enabled())
+   {
+     if (!con->scon || strncmp(con->scon, UNKNOWN_SL, strlen(UNKNOWN_SL)) == 0)
+     {
+@@ -1779,12 +1779,22 @@
+   }
+ 
+ #ifdef WITH_LSPP
+-  if (is_lspp_config())
++  if (is_selinux_mls_enabled())
+   {
+    /*
+     * duplicate the security context and auid of the connection into the job structure
+     */
+     job->scon = strdup(con->scon);
++    const char	*range = NULL;
++    const char	*type = NULL;
++    const char	*role = NULL;
++    const char	*user = NULL;
++    context_t	jobcon;			/* SELinux context of the job */
++    jobcon = context_new(con->scon);
++    range = context_range_get(jobcon);
++    type = context_type_get(jobcon);
++    role = context_role_get(jobcon);
++    user = context_user_get(jobcon);
+     job->auid = con->auid;
+ 
+    /* 
+@@ -1793,6 +1803,14 @@
+     */
+     ippAddString(con->request, IPP_TAG_JOB, IPP_TAG_NAME, "security-context", 
+ 		 NULL, job->scon);
++    ippAddString(con->request, IPP_TAG_JOB, IPP_TAG_NAME, "security-context-range", 
++		 NULL, range);
++    ippAddString(con->request, IPP_TAG_JOB, IPP_TAG_NAME, "security-context-type", 
++		 NULL, type);
++    ippAddString(con->request, IPP_TAG_JOB, IPP_TAG_NAME, "security-context-role", 
++		 NULL, role);
++    ippAddString(con->request, IPP_TAG_JOB, IPP_TAG_NAME, "security-context-user", 
++		 NULL, user);
+   }
+   else
+   {
+diff -ruN cups-1.6.2/scheduler/job.c cups-1.6.2-mod/scheduler/job.c
+--- cups-1.6.2/scheduler/job.c	2013-10-31 09:16:20.501027851 +0000
++++ cups-1.6.2-mod/scheduler/job.c	2013-10-31 09:13:01.692563543 +0000
+@@ -1864,7 +1864,7 @@
+ #ifdef WITH_LSPP
+   if ((attr = ippFindAttribute(job->attrs, "security-context", IPP_TAG_NAME)) != NULL)
+     cupsdSetString(&job->scon, attr->values[0].string.text);
+-  else if (is_lspp_config())
++  else if (is_selinux_mls_enabled())
+   {
+    /*
+     * There was no security context so delete the job
+@@ -4756,7 +4756,7 @@
+ 	fcntl(job->side_pipes[1], F_GETFD) | FD_CLOEXEC);
+ 
+ #ifdef WITH_LSPP
+-  if (is_lspp_config())
++  if (is_selinux_mls_enabled())
+   {
+    /*
+     * Perform an access check before printing, but only if the printer starts with /dev/

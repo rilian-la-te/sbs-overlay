@@ -1,0 +1,133 @@
+diff --git a/cups/cups/usersys.c b/cups/cups/usersys.c
+index 9b4e07e..ad76b4c 100644
+--- a/cups/usersys.c
++++ b/cups/usersys.c
+@@ -737,6 +737,49 @@
+ #endif /* HAVE_GSSAPI */
+ 
+ 
++static int
++_cupsUnixSocketAccess(const char* name)
++{
++	struct sockaddr_un s_un;
++	int sock = -1;
++	int ret = 0;
++
++	bzero(&s_un, sizeof(s_un));
++
++	strncpy(s_un.sun_path, name,sizeof s_un.sun_path);
++	s_un.sun_family = AF_UNIX;
++
++	if (((sock = socket(AF_UNIX, SOCK_STREAM, 0)) > 0) &&
++	    (connect(sock, (struct sockaddr *)&s_un,SUN_LEN(&s_un)) == 0))
++	       ret = 1;
++
++	if (sock >= 0) close(sock);
++	return ret;
++}
++
++static int
++_cupsLocalhostAccess(int port)
++{
++	struct sockaddr_in s_in;
++	int sock = -1;
++	int ret = 0;
++
++	bzero(&s_in, sizeof(s_in));
++
++	s_in.sin_family = AF_INET;
++	s_in.sin_port = htons(port);
++
++	if (inet_aton("127.0.0.1", (struct in_addr*)&(s_in.sin_addr)) == 0)
++	    return 0;
++
++	if (((sock = socket(AF_INET, SOCK_STREAM, 0)) > 0) &&
++	    (connect(sock, (struct sockaddr *)&s_in,sizeof(s_in)) == 0))
++	       ret = 1;
++
++	if (sock >= 0) close(sock);
++	return ret;
++}
++
+ /*
+  * '_cupsSetDefaults()' - Set the default server, port, and encryption.
+  */
+@@ -964,6 +1007,24 @@
+       cg->ipp_port = atoi(value);
+   }
+ 
++  if (!cg->ipp_port)
++  {
++    const char		*ipp_port;	/* IPP_PORT environment variable */
++    struct servent	*service;	/* Port number info */
++
++
++    if ((ipp_port = getenv("IPP_PORT")) != NULL)
++    {
++      if ((cg->ipp_port = atoi(ipp_port)) <= 0)
++        cg->ipp_port = CUPS_DEFAULT_IPP_PORT;
++    }
++    else if ((service = getservbyname("ipp", NULL)) == NULL ||
++             service->s_port <= 0)
++      cg->ipp_port = CUPS_DEFAULT_IPP_PORT;
++    else
++      cg->ipp_port = ntohs(service->s_port);
++  }
++
+   if (!cg->server[0])
+   {
+ #ifdef CUPS_DEFAULT_DOMAINSOCKET
+@@ -974,29 +1035,19 @@
+ 
+     struct stat	sockinfo;		/* Domain socket information */
+ 
+-    if (!stat(CUPS_DEFAULT_DOMAINSOCKET, &sockinfo) &&
+-	(sockinfo.st_mode & (S_IROTH | S_IWOTH)) == (S_IROTH | S_IWOTH))
+-      cups_server = CUPS_DEFAULT_DOMAINSOCKET;
++    if (_cupsUnixSocketAccess(CUPS_DEFAULT_DOMAINSOCKET))
++         cups_server = CUPS_DEFAULT_DOMAINSOCKET;
++    else if (_cupsLocalhostAccess(cg->ipp_port))
++         cups_server = "localhost";
+     else
++         cups_server = CUPS_DEFAULT_DOMAINSOCKET;
++#else
++         cups_server = "localhost";
+ #endif /* CUPS_DEFAULT_DOMAINSOCKET */
+-      cups_server = "localhost";
+ 
+     cupsSetServer(cups_server);
+   }
+ 
+-  if (!cg->ipp_port)
+-  {
+-    const char	*ipp_port;		/* IPP_PORT environment variable */
+-
+-    if ((ipp_port = getenv("IPP_PORT")) != NULL)
+-    {
+-      if ((cg->ipp_port = atoi(ipp_port)) <= 0)
+-        cg->ipp_port = CUPS_DEFAULT_IPP_PORT;
+-    }
+-    else
+-      cg->ipp_port = CUPS_DEFAULT_IPP_PORT;
+-  }
+-
+   if (!cg->user[0])
+   {
+     if (cups_user)
+diff --git a/cups/scheduler/listen.c b/cups/scheduler/listen.c
+index ce7a26d..9c4ed54 100644
+--- a/scheduler/listen.c
++++ b/scheduler/listen.c
+@@ -306,7 +306,11 @@ cupsdStartListening(void)
+       cupsdLogMessage(CUPSD_LOG_INFO, "Listening to %s on fd %d...",
+         	      s, lis->fd);
+ 
+-      if (chmod(s, 0140777))
++      if (chmod(s, 0770))
++	cupsdLogMessage(CUPSD_LOG_ERROR,
++			"Unable to change permisssions on domain socket "
++			"\"%s\" - %s", s, strerror(errno));
++      if (chown(s, 0,Group))
+ 	cupsdLogMessage(CUPSD_LOG_ERROR,
+ 			"Unable to change permisssions on domain socket "
+ 			"\"%s\" - %s", s, strerror(errno));
