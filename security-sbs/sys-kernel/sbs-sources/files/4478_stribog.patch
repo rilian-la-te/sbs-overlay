@@ -1239,10 +1239,10 @@ index 0000000..3fe3928
 +MODULE_LICENSE("GPL");
 +MODULE_DESCRIPTION("Russian Stribog Secure Hash Algorithms");
 +
-+MODULE_ALIAS("stribog");
-+MODULE_ALIAS("stribog256");
-+MODULE_ALIAS("stribog512");
-+MODULE_ALIAS("gost34112012");
++MODULE_ALIAS_CRYPTO("stribog");
++MODULE_ALIAS_CRYPTO("stribog256");
++MODULE_ALIAS_CRYPTO("stribog512");
++MODULE_ALIAS_CRYPTO("gost34112012");
 diff --git a/include/crypto/stribog.h b/include/crypto/stribog.h
 new file mode 100644
 index 0000000..73817af

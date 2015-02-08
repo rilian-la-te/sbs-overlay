@@ -401,7 +401,7 @@ index 0000000..acf92fb
 +
 +MODULE_LICENSE("GPL");
 +MODULE_DESCRIPTION ("GOST Cipher / CryptoAPI");
-+MODULE_ALIAS("gost");
++MODULE_ALIAS_CRYPTO("gost");
 diff --git a/include/crypto/gost.h b/include/crypto/gost.h
 new file mode 100644
 index 0000000..c502007

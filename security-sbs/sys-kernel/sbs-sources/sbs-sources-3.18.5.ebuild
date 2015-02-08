@@ -19,6 +19,7 @@ SRC_URI="${KERNEL_URI} ${HGPV_URI} ${GENPATCHES_URI} ${ARCH_URI}"
 UNIPATCH_LIST="${DISTDIR}/hardened-patches-${HGPV}.extras.tar.bz2
 				${FILESDIR}/4480_gost.patch
 				${FILESDIR}/4479_ima.patch
+				${FILESDIR}/4481_alt_s0_netlink.patch
 				${FILESDIR}/4478_stribog.patch"
 UNIPATCH_EXCLUDE="
 	1500_XATTR_USER_PREFIX.patch
