@@ -114,20 +114,3 @@ index 9b4e07e..ad76b4c 100644
    if (!cg->user[0])
    {
      if (cups_user)
-diff --git a/cups/scheduler/listen.c b/cups/scheduler/listen.c
-index ce7a26d..9c4ed54 100644
---- a/scheduler/listen.c
-+++ b/scheduler/listen.c
-@@ -306,7 +306,11 @@ cupsdStartListening(void)
-       cupsdLogMessage(CUPSD_LOG_INFO, "Listening to %s on fd %d...",
-         	      s, lis->fd);
- 
--      if (chmod(s, 0140777))
-+      if (chmod(s, 0770))
-+	cupsdLogMessage(CUPSD_LOG_ERROR,
-+			"Unable to change permisssions on domain socket "
-+			"\"%s\" - %s", s, strerror(errno));
-+      if (chown(s, 0,Group))
- 	cupsdLogMessage(CUPSD_LOG_ERROR,
- 			"Unable to change permisssions on domain socket "
- 			"\"%s\" - %s", s, strerror(errno));

@@ -255,9 +255,9 @@ diff -up cups-2.0.1/scheduler/log.c.journal cups-2.0.1/scheduler/log.c
 --- cups-2.0.1/scheduler/log.c.journal	2014-11-06 14:10:00.154328144 +0000
 +++ cups-2.0.1/scheduler/log.c	2014-11-06 14:10:00.188328333 +0000
 @@ -23,6 +23,12 @@
- #include <sys/types.h>
- #include <sys/stat.h>
- #include <unistd.h>
+ #include "cupsd.h"
+ #include <stdarg.h>
+ #include <syslog.h>
 +#include <sys/uio.h>
 +#ifdef HAVE_SYSTEMD
 +/* We handle location fields ourselves */

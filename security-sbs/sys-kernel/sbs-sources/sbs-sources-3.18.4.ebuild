@@ -6,7 +6,7 @@ EAPI="5"
 
 ETYPE="sources"
 K_WANT_GENPATCHES="base"
-K_GENPATCHES_VER="5"
+K_GENPATCHES_VER="6"
 K_DEBLOB_AVAILABLE="1"
 
 inherit kernel-2
@@ -22,7 +22,8 @@ UNIPATCH_LIST="${DISTDIR}/hardened-patches-${HGPV}.extras.tar.bz2
 				${FILESDIR}/4478_stribog.patch"
 UNIPATCH_EXCLUDE="
 	1500_XATTR_USER_PREFIX.patch
-	2900_dev-root-proc-mount-fix.patch"
+	2900_dev-root-proc-mount-fix.patch
+	2710_i915-drm-disallow-pin-ioctl-for-kms-drivers.patch"
 
 DESCRIPTION="Hardened kernel sources (kernel series ${KV_MAJOR}.${KV_MINOR})"
 HOMEPAGE="http://www.gentoo.org/proj/en/hardened/"

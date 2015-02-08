@@ -102,7 +102,7 @@ PATCHES=(
 	"${FILESDIR}/${P}-fix-compilation.patch"
 	"${FILESDIR}/${P}-xinetd-installation-fix.patch"
 	"${FILESDIR}/${P}-fix-linkage-to-gnutls.patch"
-#	"${FILESDIR}/${PN}-journal.patch"
+	"${FILESDIR}/${PN}-journal.patch"
 	"${FILESDIR}/${PN}-str3382.patch"
 	"${FILESDIR}/${PN}-direct-usb.patch"
 	"${FILESDIR}/${PN}-uri-compat.patch"
@@ -110,7 +110,10 @@ PATCHES=(
 	"${FILESDIR}/${PN}-pid.patch"
 	"${FILESDIR}/${PN}-driverd-timeout.patch"
 	"${FILESDIR}/${PN}-ALT-lspp-SE.patch"
-#	"${FILESDIR}/${PN}-ALT-hardening.patch"
+	"${FILESDIR}/${PN}-ALT-pwg-raster-attributes.patch"
+	"${FILESDIR}/${PN}-ALT-lpd-utf8.patch"
+	"${FILESDIR}/${PN}-ALT-remove_BSD.patch"				
+	"${FILESDIR}/${PN}-ALT-hardening.patch"
 )
 
 MULTILIB_CHOST_TOOLS=(

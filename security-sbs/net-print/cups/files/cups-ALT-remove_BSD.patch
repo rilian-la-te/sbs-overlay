@@ -30,17 +30,6 @@ diff -ur cups-1.7.0.old/scheduler/cups.sh.in cups-1.7.0/scheduler/cups.sh.in
  	if test -f $file; then
  	        . $file
  	fi
-@@ -138,10 +125,6 @@
- 	SunOS*)
- 		pid=`ps -e | nawk '{if (match($4, ".*/cupsd$") || $4 == "cupsd") print $1}'`
- 		;;
--	UnixWare*)
--		pid=`ps -e | awk '{if (match($6, ".*/cupsd$") || $6 == "cupsd") print $1}'`
--		. /etc/TIMEZONE
--		;;
- 	OSF1*)
- 		pid=`ps -e | awk '{if (match($5, ".*/cupsd$") || $5 == "cupsd") print $1}'`
- 		;;
 @@ -160,10 +143,6 @@
  case $1 in
  	start | restart | reload)
