@@ -1,0 +1,25 @@
+--- a/netlabel_tools/netlabelctl/Makefile
++++ b/netlabel_tools/netlabelctl/Makefile
+@@ -49,7 +49,8 @@ CONF_FILE = netlabel.rules
+ 
+ OBJS = main.o mgmt.o map.o unlabeled.o cipsov4.o
+ 
+-LDFLAGS := ../libnetlabel/libnetlabel.a -lnl -lm
++# LDFLAGS := ../libnetlabel/libnetlabel.a -lnl -lm
++LIBFLAGS := -lnl -lm
+ 
+ DEPS = $(OBJS:%.o=%.d)
+ 
+diff --git a/netlabel_tools/install.mk b/netlabel_tools/install.mk
+index d974c11..14b52f3 100644
+--- a/netlabel_tools/install.mk
++++ b/netlabel_tools/install.mk
+@@ -24,7 +24,7 @@ INSTALL_PREFIX ?= $(CONF_INSTALL_PREFIX)
+ INSTALL_SBIN_DIR ?= $(DESTDIR)/$(INSTALL_PREFIX)/sbin
+ INSTALL_BIN_DIR ?= $(DESTDIR)/$(INSTALL_PREFIX)/bin
+ INSTALL_LIB_DIR ?= $(DESTDIR)/$(CONF_INSTALL_LIBDIR)
+-INSTALL_SYSD_DIR ?= $(DESTDIR)/$(INSTALL_PREFIX)/lib/systemd/system
++INSTALL_SYSD_DIR ?= $(DESTDIR)/lib/systemd/system
+ INSTALL_ETC_DIR ?= $(DESTDIR)/etc
+ INSTALL_INC_DIR ?= $(DESTDIR)/$(INSTALL_PREFIX)/include
+ INSTALL_MAN_DIR ?= $(DESTDIR)/$(INSTALL_PREFIX)/share/man

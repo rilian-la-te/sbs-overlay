@@ -1,0 +1,276 @@
+diff --git a/netlabel_tools/include/libnetlabel.h b/netlabel_tools/include/libnetlabel.h
+index cd7d50f..c20acdf 100644
+--- a/netlabel_tools/include/libnetlabel.h
++++ b/netlabel_tools/include/libnetlabel.h
+@@ -306,6 +306,8 @@ int nlbl_mgmt_del(struct nlbl_handle *hndl, char *domain);
+ int nlbl_mgmt_deldef(struct nlbl_handle *hndl);
+ int nlbl_mgmt_listall(struct nlbl_handle *hndl, struct nlbl_dommap **domains);
+ int nlbl_mgmt_listdef(struct nlbl_handle *hndl, struct nlbl_dommap *domain);
++int nlbl_mgmt_s0_set(struct nlbl_handle *hndl, uint8_t mark_flag);
++int nlbl_mgmt_s0_get(struct nlbl_handle *hndl, uint8_t *mark_flag);
+ 
+ /* Unlabeled Traffic */
+ int nlbl_unlbl_accept(struct nlbl_handle *hndl, uint8_t allow_flag);
+diff --git a/netlabel_tools/include/netlabel.h b/netlabel_tools/include/netlabel.h
+index 021a0db..a630851 100644
+--- a/netlabel_tools/include/netlabel.h
++++ b/netlabel_tools/include/netlabel.h
+@@ -67,6 +67,8 @@ enum {
+ 	NLBL_MGMT_C_LISTDEF,
+ 	NLBL_MGMT_C_PROTOCOLS,
+ 	NLBL_MGMT_C_VERSION,
++	NLBL_MGMT_C_S0_SET,
++	NLBL_MGMT_C_S0_GET,
+ 	__NLBL_MGMT_C_MAX,
+ };
+ #define NLBL_MGMT_C_MAX (__NLBL_MGMT_C_MAX - 1)
+@@ -86,6 +88,7 @@ enum {
+ 	NLBL_MGMT_A_IPV4MASK,
+ 	NLBL_MGMT_A_ADDRSELECTOR,
+ 	NLBL_MGMT_A_SELECTORLIST,
++	NLBL_MGMT_A_S0,
+ 	__NLBL_MGMT_A_MAX,
+ };
+ #define NLBL_MGMT_A_MAX (__NLBL_MGMT_A_MAX - 1)
+diff --git a/netlabel_tools/libnetlabel/mod_mgmt.c b/netlabel_tools/libnetlabel/mod_mgmt.c
+index 4bc7296..274fe78 100644
+--- a/netlabel_tools/libnetlabel/mod_mgmt.c
++++ b/netlabel_tools/libnetlabel/mod_mgmt.c
+@@ -333,6 +333,155 @@ init_return:
+  */
+ 
+ /**
++ * Set the mark s0 flag
++ * @param hndl the NetLabel handle
++ * @param mark_flag the desired s0 flag setting
++ *
++ * Set the mark s0 flag in the NetLabel system; if @mark_flag is
++ * true then set the mark s0 flag, otherwise clear the flag.  If @hndl is NULL
++ * then the function will handle opening and closing it's own NetLabel handle.
++ * Returns zero on success, negative values on failure.
++ *
++ */
++int nlbl_mgmt_s0_set(struct nlbl_handle *hndl, uint8_t mark_flag)
++{
++	int ret_val = -ENOMEM;
++	struct nlbl_handle *p_hndl = hndl;
++	nlbl_msg *msg = NULL;
++	nlbl_msg *ans_msg = NULL;
++
++	/* sanity checks */
++	if (nlbl_mgmt_fid == 0)
++		return -ENOPROTOOPT;
++
++	/* open a handle if we need one */
++	if (p_hndl == NULL) {
++		p_hndl = nlbl_comm_open();
++		if (p_hndl == NULL)
++			goto accept_return;
++	}
++
++	/* create a new message */
++	msg = nlbl_mgmt_msg_new(NLBL_MGMT_C_S0_SET, 0);
++	if (msg == NULL)
++		goto accept_return;
++
++	/* add the required attributes to the message */
++	if (mark_flag)
++		ret_val = nla_put_u8(msg, NLBL_MGMT_A_S0, 1);
++	else
++		ret_val = nla_put_u8(msg, NLBL_MGMT_A_S0, 0);
++	if (ret_val != 0)
++		goto accept_return;
++
++	/* send the request */
++	ret_val = nlbl_comm_send(p_hndl, msg);
++	if (ret_val <= 0) {
++		if (ret_val == 0)
++			ret_val = -ENODATA;
++		goto accept_return;
++	}
++
++	/* read the response */
++	ret_val = nlbl_mgmt_recv(p_hndl, &ans_msg);
++	if (ret_val <= 0) {
++		if (ret_val == 0)
++			ret_val = -ENODATA;
++		goto accept_return;
++	}
++
++	/* process the response */
++	ret_val = nlbl_mgmt_parse_ack(ans_msg);
++
++accept_return:
++	if (hndl == NULL)
++		nlbl_comm_close(p_hndl);
++	nlbl_msg_free(msg);
++	nlbl_msg_free(ans_msg);
++	return ret_val;
++}
++
++/**
++ * Query the s0 mark flag
++ * @param hndl the NetLabel handle
++ * @param mark_flag the current s0 mark flag setting
++ *
++ * Query the s0 mark flag in the NetLabel system.  If @hndl is NULL then
++ * the function will handle opening and closing it's own NetLabel handle.
++ * Returns zero on success, negative values on failure.
++ *
++ */
++int nlbl_mgmt_s0_get(struct nlbl_handle *hndl, uint8_t *mark_flag)
++{
++	int ret_val = -ENOMEM;
++	struct nlbl_handle *p_hndl = hndl;
++	nlbl_msg *msg = NULL;
++	nlbl_msg *ans_msg = NULL;
++	struct genlmsghdr *genl_hdr;
++	struct nlattr *nla;
++
++	/* sanity checks */
++	if (mark_flag == NULL)
++		return -EINVAL;
++	if (nlbl_mgmt_fid == 0)
++		return -ENOPROTOOPT;
++
++	/* open a handle if we need one */
++	if (p_hndl == NULL) {
++		p_hndl = nlbl_comm_open();
++		if (p_hndl == NULL)
++			goto list_return;
++	}
++
++	/* create a new message */
++	msg = nlbl_mgmt_msg_new(NLBL_MGMT_C_S0_GET, 0);
++	if (msg == NULL)
++		goto list_return;
++
++	/* send the request */
++	ret_val = nlbl_comm_send(p_hndl, msg);
++	if (ret_val <= 0) {
++		if (ret_val == 0)
++			ret_val = -ENODATA;
++		goto list_return;
++	}
++
++	/* read the response */
++	ret_val = nlbl_mgmt_recv(p_hndl, &ans_msg);
++	if (ret_val <= 0) {
++		if (ret_val == 0)
++			ret_val = -ENODATA;
++		goto list_return;
++	}
++
++	/* check the response */
++	ret_val = nlbl_mgmt_parse_ack(ans_msg);
++	if (ret_val < 0 && ret_val != -ENOMSG)
++		goto list_return;
++	genl_hdr = nlbl_msg_genlhdr(ans_msg);
++	if (genl_hdr == NULL || genl_hdr->cmd != NLBL_MGMT_C_S0_GET) {
++		ret_val = -EBADMSG;
++		goto list_return;
++	}
++
++	/* process the response */
++	nla = nlbl_attr_find(ans_msg, NLBL_MGMT_A_S0);
++	if (nla == NULL)
++		goto list_return;
++	*mark_flag = nla_get_u8(nla);
++
++	ret_val = 0;
++
++list_return:
++	if (hndl == NULL)
++		nlbl_comm_close(p_hndl);
++	nlbl_msg_free(msg);
++	nlbl_msg_free(ans_msg);
++	return ret_val;
++}
++
++
++/**
+  * Determine the supported list of NetLabel protocols
+  * @param hndl the NetLabel handle
+  * @param protocols protocol array
+diff --git a/netlabel_tools/netlabelctl/main.c b/netlabel_tools/netlabelctl/main.c
+index 4479bbf..09dbf59 100644
+--- a/netlabel_tools/netlabelctl/main.c
++++ b/netlabel_tools/netlabelctl/main.c
+@@ -96,6 +96,7 @@ static void nlctl_help_print(FILE *fp)
+ 	"    version\n"
+ 	"    protocols\n"
+ 	"  map : Domain/Protocol mapping\n"
++	"    s0 on|off\n"
+ 	"    add default|domain:<domain> [address:<ADDR>[/<MASK>]]\n"
+ 	"                                protocol:<protocol>[,<extra>]\n"
+ 	"    del default|domain:<domain>\n"
+diff --git a/netlabel_tools/netlabelctl/map.c b/netlabel_tools/netlabelctl/map.c
+index 3973d7b..a36b175 100644
+--- a/netlabel_tools/netlabelctl/map.c
++++ b/netlabel_tools/netlabelctl/map.c
+@@ -35,6 +35,39 @@
+ #include "netlabelctl.h"
+ 
+ /**
++ * Set the NetLabel s0 flag
++ * @param argc the number of arguments
++ * @param argv the argument list
++ *
++ * Set the kernel's label s0 flag.  Returns zero on success,
++ * negative values on failure.
++ *
++ */
++int map_s0(int argc, char *argv[])
++{
++	int ret_val;
++	uint8_t flag;
++
++	/* sanity check */
++	if (argc != 1 || argv == NULL || argv[0] == NULL)
++		return -EINVAL;
++
++	/* set or reset the flag? */
++	if (strcasecmp(argv[0], "on") == 0 || strcmp(argv[0], "1") == 0)
++		flag = 1;
++	else if (strcasecmp(argv[0], "off") == 0 || strcmp(argv[0], "0") == 0)
++		flag = 0;
++	else
++		return -EINVAL;
++
++	ret_val = nlbl_mgmt_s0_set(NULL, flag);
++	if (ret_val < 0)
++		return ret_val;
++
++	return 0;
++}
++
++/**
+  * Add a domain mapping to NetLabel
+  * @param argc the number of arguments
+  * @param argv the argument list
+@@ -270,6 +303,15 @@ int map_list(int argc, char *argv[])
+ 	struct nlbl_dommap *mapping;
+ 	size_t count;
+ 	uint32_t iter;
++    uint8_t flag;
++
++	/* display the s0 mark flag */
++    ret_val = nlbl_mgmt_s0_get(NULL, &flag);
++    if (ret_val < 0)
++        printf("Mark s0 packets: %s\n", "unsupported");
++    else
++        printf("Mark s0 packets: %s\n",
++                (flag ? "on" : "off"));
+ 
+ 	/* get the list of mappings */
+ 	ret_val = nlbl_mgmt_listall(NULL, &mapping);
+@@ -333,6 +375,9 @@ int map_main(int argc, char *argv[])
+ 	} else if (strcmp(argv[0], "list") == 0) {
+ 		/* list the domain mappings */
+ 		ret_val = map_list(argc - 1, argv + 1);
++    } else if (strcmp(argv[0], "s0") == 0) {
++		/* accept flag */
++		ret_val = map_s0(argc - 1, argv + 1);
+ 	} else {
+ 		/* unknown request */
+ 		ret_val = -EINVAL;
