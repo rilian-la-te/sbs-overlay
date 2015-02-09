@@ -1,0 +1,32 @@
+From b34e8c6ca890f53d74c32868ccb2ad97292b99f1 Mon Sep 17 00:00:00 2001
+From: Timur Aitov <timonbl4@altlinux.org>
+Date: Tue, 16 Apr 2013 15:55:11 +0400
+Subject: [PATCH] policycoreutils: fix free groups
+
+---
+ policycoreutils/mcstrans/src/mcstrans.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/policycoreutils/mcstrans/src/mcstrans.c b/policycoreutils/mcstrans/src/mcstrans.c
+index 4d31857..1014ba7 100644
+--- a/policycoreutils/mcstrans/src/mcstrans.c
++++ b/policycoreutils/mcstrans/src/mcstrans.c
+@@ -1285,6 +1285,7 @@ compute_trans_from_raw(const char *level, domain_t *domain) {
+ 	gettimeofday(&startTime, 0);
+ #endif
+ 
++	word_group_t *groups = NULL;
+ 	mls_level_t *l = NULL;
+ 	char *rval = NULL;
+ 	ebitmap_t bit_diff, temp, handled, nothandled, unhandled, orig_unhandled;
+@@ -1313,7 +1314,6 @@ compute_trans_from_raw(const char *level, domain_t *domain) {
+ 
+ 	int doInverse = l->sens > 0;
+ 
+-	word_group_t *groups = NULL;
+ 	base_classification_t *bc, *last = NULL;
+ 	int done = 0;
+ 	for (bc = domain->base_classifications; bc && !done; bc = bc->next) {
+-- 
+1.8.1.3
+

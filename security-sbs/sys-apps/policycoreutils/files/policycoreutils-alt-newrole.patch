@@ -1,0 +1,30 @@
+--- a/policycoreutils/newrole/newrole.c	2013-07-04 18:29:41.474221160 +0400
++++ b/policycoreutils/newrole/newrole.c	2013-04-18 14:34:21.361040402 +0400
+@@ -201,6 +201,18 @@
+ 			fprintf(stderr, _("failed to set PAM_TTY\n"));
+ 			goto out;
+ 		}
++
++        if (pam_rc == PAM_SUCCESS) {
++            const char *ruser = getlogin();      /* Who is running this program? */
++            if (ruser) {
++                pam_rc = pam_set_item(pam_handle, PAM_RUSER, (const void *)ruser);
++            }
++            ruser = NULL;
++        }
++
++        if (pam_rc == PAM_SUCCESS) {
++            pam_rc = pam_set_item(pam_handle, PAM_RHOST, (const void *)"localhost");
++        }
+ 	}
+ 
+ 	/* Ask PAM to authenticate the user running this program */
+@@ -588,7 +600,7 @@
+ 		return -1;
+ 	}
+ 	if (! full) 
+-		capng_updatev(CAPNG_ADD, CAPNG_EFFECTIVE | CAPNG_PERMITTED, CAP_SYS_ADMIN , CAP_FOWNER , CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_SETPCAP, -1);
++		capng_updatev(CAPNG_ADD, CAPNG_EFFECTIVE | CAPNG_PERMITTED, CAP_SYS_ADMIN , CAP_FOWNER , CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_SETPCAP, CAP_SETGID, CAP_AUDIT_WRITE, -1);
+ 	return capng_apply(CAPNG_SELECT_BOTH);
+ }
+ 

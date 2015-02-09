@@ -1,0 +1,289 @@
+From 4ae77302f70099971caee5bee4e903a9382c0822 Mon Sep 17 00:00:00 2001
+From: Timur Aitov <timonbl4@altlinux.org>
+Date: Wed, 17 Apr 2013 13:54:30 +0400
+Subject: [PATCH] policycoreutils: also try convert sensitivity and categoryset
+ separately
+
+---
+ policycoreutils/mcstrans/src/mcstrans.c | 212 +++++++++++++++++++++++++++++---
+ 1 file changed, 196 insertions(+), 16 deletions(-)
+
+diff --git a/policycoreutils/mcstrans/src/mcstrans.c b/policycoreutils/mcstrans/src/mcstrans.c
+index 1014ba7..3300ee3 100644
+--- a/policycoreutils/mcstrans/src/mcstrans.c
++++ b/policycoreutils/mcstrans/src/mcstrans.c
+@@ -1495,6 +1495,80 @@ err:
+ 	return NULL;
+ }
+ 
++char*
++trans_part(const char *part, domain_t *domain, int *f) {
++	char *trans = find_in_hashtable(part, domain, domain->raw_to_trans);
++	if (!trans) {
++		trans = compute_trans_from_raw(part, domain);
++		if (trans) {
++			*f = 1;
++			if (add_cache(domain, part, trans) < 0)
++				return NULL;
++		} else {
++			trans = strdup(part);
++			if (!trans) {
++				log_error("strdup failed %s", strerror(errno));
++				return NULL;
++			}
++		}
++	} else {
++		*f = 1;
++	}
++	return trans;
++}
++
++char*
++trans_level(const char *level, domain_t *domain, int *found) {
++	int f = 0;
++	char *ch, *ptrans = NULL, *ttrans = NULL;
++	char *clevel = strdup(level);
++	char *tlevel = clevel;
++
++	ttrans = (char*)malloc(1);
++	*ttrans = 0;
++
++	while((ch = strpbrk(clevel, "-:,.")) != NULL) {
++		int l;
++		char old = *ch;
++		*ch = 0;
++
++		ptrans = trans_part(clevel, domain, &f);
++		if (! ptrans) {
++			free(ttrans);
++			free(tlevel);
++			return NULL;
++		}
++
++		ttrans = (char*)realloc(ttrans, strlen(ttrans) + strlen(ptrans) + 2);
++		strcat(ttrans, ptrans);
++		l = strlen(ttrans);
++		ttrans[l] = old;
++		ttrans[l + 1] = 0;
++
++		free(ptrans);
++		clevel = ch + 1;
++		*ch = old;
++	}
++
++	ptrans = trans_part(clevel, domain, &f);
++	if (!ptrans) {
++		free(ttrans);
++		free(tlevel);
++		return NULL;
++	}
++
++	ttrans = (char*)realloc(ttrans, strlen(ttrans) + strlen(ptrans) + 1);
++	strcat(ttrans, ptrans);
++
++	free(ptrans);
++	free(tlevel);
++
++	if (found != NULL)
++		*found = f;
++
++	return ttrans;
++}
++
+ int
+ trans_context(const security_context_t incon, security_context_t *rcon) {
+ 	char *trans = NULL;
+@@ -1537,11 +1611,9 @@ trans_context(const security_context_t incon, security_context_t *rcon) {
+ 					if (add_cache(domain, lrange, ltrans) < 0)
+ 						return -1;
+ 				} else {
+-					ltrans = strdup(lrange);
+-					if (! ltrans) {
+-						log_error("strdup failed %s", strerror(errno));
++					ltrans = trans_level(lrange, domain, NULL);
++					if (! ltrans)
+ 						return -1;
+-					}
+ 				}
+ 			}
+ 
+@@ -1552,11 +1624,9 @@ trans_context(const security_context_t incon, security_context_t *rcon) {
+ 					if (add_cache(domain, urange, utrans) < 0)
+ 						return -1;
+ 				} else {
+-					utrans = strdup(urange);
+-					if (! utrans) {
+-						log_error("strdup failed %s", strerror(errno));
++					utrans = trans_level(urange, domain, NULL);
++					if (! utrans)
+  						return -1;
+- 					}
+  				}
+ 			}
+ 
+@@ -1580,6 +1650,21 @@ trans_context(const security_context_t incon, security_context_t *rcon) {
+ 			*dashp = '-';
+ 	}
+ 
++	if (! trans) {
++		domain = domains;
++		for (;domain; domain = domain->next) {
++			int f;
++			char *ttrans = trans_level(range, domain, &f);
++
++			if (f == 1) {
++				trans = ttrans;
++				break;
++			}
++
++			free(ttrans);
++		}
++	}
++
+ 	if (trans) {
+ 		*rcon = new_context_str(incon, trans);
+ 		free(trans);
+@@ -1602,6 +1687,90 @@ trans_context(const security_context_t incon, security_context_t *rcon) {
+ 	return 0;
+ }
+ 
++char*
++untrans_part(const char *part, domain_t *domain, int *f) {
++	char *raw = find_in_hashtable(part, domain, domain->trans_to_raw);
++	if (!raw) {
++		raw = compute_raw_from_trans(part, domain);
++		if (raw) {
++			char *canonical = find_in_hashtable(raw, domain, domain->raw_to_trans);
++			if (!canonical) {
++				canonical = compute_trans_from_raw(raw, domain);
++				if (canonical)
++					if (add_cache(domain, raw, canonical) < 0)
++						return NULL;
++			}
++			if (canonical)
++				free(canonical);
++			if (add_cache(domain, raw, part) < 0)
++				return NULL;
++			*f = 1;
++		} else {
++			raw = strdup(part);
++			if (!raw) {
++				log_error("strdup failed %s", strerror(errno));
++				return NULL;
++			}
++		}
++	} else {
++		*f = 1;
++	}
++	return raw;
++}
++
++char*
++untrans_level(const char *level, domain_t *domain, int *found) {
++	int f = 0;
++	char *ch, *praw = NULL, *traw = NULL;
++	char *clevel = strdup(level);
++	char *tlevel = clevel;
++
++	traw = (char*)malloc(1);
++	*traw = 0;
++
++	while((ch = strpbrk(clevel, "-:,.")) != NULL) {
++		int l;
++		char old = *ch;
++		*ch = 0;
++
++		praw = untrans_part(clevel, domain, &f);
++		if (!praw) {
++			free(traw);
++			free(tlevel);
++			return NULL;
++		}
++
++		traw = (char*)realloc(traw, strlen(traw) + strlen(praw) + 2);
++		strcat(traw, praw);
++		l = strlen(traw);
++		traw[l] = old;
++		traw[l + 1] = 0;
++
++		free(praw);
++		clevel = ch + 1;
++		*ch = old;
++	}
++
++	praw = untrans_part(clevel, domain, &f);
++	if (!praw) {
++		free(traw);
++		free(tlevel);
++		return NULL;
++	}
++
++	traw = (char*)realloc(traw, strlen(traw) + strlen(praw) + 1);
++	strcat(traw, praw);
++
++	free(praw);
++	free(tlevel);
++
++	if (found != NULL) {
++		*found = f;
++	}
++
++	return traw;
++}
++
+ int
+ untrans_context(const security_context_t incon, security_context_t *rcon) {
+ 	char *raw = NULL;
+@@ -1666,11 +1835,9 @@ untrans_context(const security_context_t incon, security_context_t *rcon) {
+ 					if (add_cache(domain, lraw, lrange) < 0)
+ 						return -1;
+ 				} else {
+-					lraw = strdup(lrange);
+-					if (! lraw) {
+-						log_error("strdup failed %s", strerror(errno));
++					lraw = untrans_level(lrange, domain, NULL);
++					if (! lraw)
+ 						return -1;
+-					}
+ 				}
+ 			}
+ 
+@@ -1690,11 +1857,9 @@ untrans_context(const security_context_t incon, security_context_t *rcon) {
+ 					if (add_cache(domain, uraw, urange) < 0)
+ 						return -1;
+ 				} else {
+-					uraw = strdup(urange);
+-					if (! uraw) {
+-						log_error("strdup failed %s", strerror(errno));
++					uraw = untrans_level(urange, domain, NULL);
++					if (! uraw)
+ 						return -1;
+-					}
+ 				}
+ 			}
+ 
+@@ -1719,6 +1884,21 @@ untrans_context(const security_context_t incon, security_context_t *rcon) {
+ 			*dashp = '-';
+ 	}
+ 
++	if (! raw) {
++		domain = domains;
++		for (;domain; domain = domain->next) {
++			int f;
++			char *traw = untrans_level(range, domain, &f);
++
++			if (f == 1) {
++				raw = traw;
++				break;
++			}
++
++			free(traw);
++		}
++	}
++
+ 	if (raw) {
+ 		*rcon = new_context_str(incon, raw);
+ 		free(raw);
+-- 
+1.8.1.3
+
