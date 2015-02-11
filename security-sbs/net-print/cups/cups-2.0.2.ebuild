@@ -98,10 +98,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-1.6.0-dont-compress-manpages.patch"
 	"${FILESDIR}/${PN}-1.6.0-fix-install-perms.patch"
 	"${FILESDIR}/${PN}-systemd-socket.patch"
-	"${FILESDIR}/${P}-rename-systemd-service-files.patch"
-	"${FILESDIR}/${P}-fix-compilation.patch"
-	"${FILESDIR}/${P}-xinetd-installation-fix.patch"
-	"${FILESDIR}/${P}-fix-linkage-to-gnutls.patch"
+	"${FILESDIR}/${PN}-2.0.1-rename-systemd-service-files.patch"
 	"${FILESDIR}/${PN}-journal.patch"
 	"${FILESDIR}/${PN}-str3382.patch"
 	"${FILESDIR}/${PN}-direct-usb.patch"
@@ -113,7 +110,6 @@ PATCHES=(
 	"${FILESDIR}/${PN}-ALT-pwg-raster-attributes.patch"
 	"${FILESDIR}/${PN}-ALT-lpd-utf8.patch"
 	"${FILESDIR}/${PN}-ALT-remove_BSD.patch"				
-	"${FILESDIR}/${PN}-ALT-hardening.patch"
 )
 
 MULTILIB_CHOST_TOOLS=(

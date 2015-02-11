@@ -4,6 +4,7 @@
 EAPI="5"
 SLOT="0"
 inherit eutils autotools flag-o-matic
+KEYWORDS="~amd64 ~x86"
 MY_PN=netlabel_tools
 S=${WORKDIR}/${MY_PN}-${PV}
 SRC_URI="mirror://sourceforge/project/netlabel/${MY_PN}/${PV}/${MY_PN}-${PV}.tar.gz"
