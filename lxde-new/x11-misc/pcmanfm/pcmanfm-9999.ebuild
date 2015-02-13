@@ -4,9 +4,9 @@
 
 EAPI=5
 
-EGIT_REPO_URI="git://git.lxde.org/git/lxde/${PN}.git"
+EGIT_REPO_URI="git://git.lxde.org/lxde/${PN}.git http://git.lxde.org/lxde/${PN}.git"
 
-inherit autotools git-2 fdo-mime
+inherit autotools git-r3 fdo-mime
 
 DESCRIPTION="Fast lightweight tabbed filemanager"
 HOMEPAGE="http://pcmanfm.sourceforge.net/"
