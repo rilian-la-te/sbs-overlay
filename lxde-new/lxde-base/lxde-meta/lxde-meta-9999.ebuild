@@ -19,7 +19,7 @@ RDEPEND=">=lxde-base/menu-cache-0.3.3
 	=lxde-base/lxmenu-data-0.1*
 	=lxde-base/lxinput-0.3*
 	=lxde-base/lxrandr-0.1*
-	lxde-base/simple-panel
+	x11-misc/vala-panel
 	>=lxde-base/lxsession-0.5.0
 	>=x11-libs/libfm-1.2.0
 	x11-terms/sakura
