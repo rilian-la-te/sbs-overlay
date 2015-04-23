@@ -1,0 +1,14 @@
+<?xml version="1.0" ?>
+<!DOCTYPE repositories SYSTEM "/dtd/repositories.dtd">
+<repositories xmlns="" version="1.1">
+  <repo priority="50" quality="experimental">
+    <name>security-sbs</name>
+    <description>Diplom program ebuilds (GOST hash + cipher +SELinux fixes)</description>
+    <homepage>https://github.com/rilian-la-te/sbs-overlay</homepage>
+    <owner>
+      <email>ria.freelander@gmail.com</email>
+      <name>Konstantin P.</name>
+    </owner>
+    <source type="git">https://github.com/rilian-la-te/sbs-overlay.git</source>
+  </repo>
+</repositories>
